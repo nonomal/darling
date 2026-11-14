@@ -18,8 +18,8 @@
 #    since ld64 only opens the file when a link refers to it.
 # 3. Framework bundles (Combine.framework, CryptoKit.framework).
 #
-# The Foundation and CoreGraphics overlays are mapped to the placeholders that
-# Foundation and CoreGraphics re-export, because the overlays link those
+# The Foundation, CoreGraphics and CoreText overlays are mapped to the placeholders that
+# Foundation, CoreGraphics and CoreText re-export, because the overlays link those
 # frameworks and cannot be their dependencies (see below).
 
 set(DARLING_SWIFT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/swift")
@@ -92,6 +92,12 @@ function(_darling_swift_dylib_map_compute out)
 	# and cannot be a dependency of it.
 	set(cg_placeholder "${CMAKE_BINARY_DIR}/src/external/cocotron/CoreGraphics/libswiftCoreGraphics_placeholder.dylib")
 	string(APPEND map " -Wl,-dylib_file,/usr/lib/swift/libswiftCoreGraphics.dylib:${cg_placeholder} -Wl,-dylib_file,@rpath/libswiftCoreGraphics.dylib:${cg_placeholder}")
+
+	# CoreText re-exports the CoreText overlay in the same way (see the CoreText CMakeLists.txt), so the overlay's
+	# install name resolves to CoreText's placeholder inside the build. The overlay links CoreText and cannot be a
+	# dependency of it.
+	set(ct_placeholder "${CMAKE_BINARY_DIR}/src/external/cocotron/CoreText/libswiftCoreText_placeholder.dylib")
+	string(APPEND map " -Wl,-dylib_file,/usr/lib/swift/libswiftCoreText.dylib:${ct_placeholder} -Wl,-dylib_file,@rpath/libswiftCoreText.dylib:${ct_placeholder}")
 
 	foreach(fw_name ${DARLING_SWIFT_FRAMEWORKS})
 		set(fw_binary "${DARLING_SWIFT_SOURCE_DIR}/${fw_name}.framework/Versions/A/${fw_name}")
