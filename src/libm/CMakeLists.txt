@@ -25,6 +25,7 @@ set(libm_sources
 	Source/sincos.c
 	Source/exp10.c
 	Source/simd_invert.c
+	Source/simd_identity.c
 	#Source/nan.c
 	#Source/nanl.c
 	#Source/version_info.c
