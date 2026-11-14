@@ -67,7 +67,10 @@ SIMD_FN Q simd_mul(Q a, Q b) {                                                \
     Q q = {{i.x, i.y, i.z, aw * bw - simd_dot(ai, bi)}};                      \
     return q;                                                                 \
 }                                                                             \
-/* A zero quaternion has no direction; it normalizes to the identity. */      \
+/* QUIRK: a zero quaternion normalizes to the identity (0, 0, 0, 1) rather   \
+ * than to NaN. Not documented. Evidence: black-box observation on macOS     \
+ * 26.7.3 x86_64 (tier 2), vd-upstream MAC-EVIDENCE.md. Test:                \
+ * test_quirk_zero_quaternion_normalizes_to_identity in simd_math.c. */       \
 SIMD_FN Q simd_normalize(Q a) {                                               \
     T len = simd_length(a);                                                   \
     Q identity = {{0, 0, 0, 1}};                                              \
@@ -77,12 +80,11 @@ SIMD_FN Q simd_normalize(Q a) {                                               \
 SIMD_FN T simd_angle(Q q) {                                                   \
     return 2 * ATAN2(simd_length(q.vector.xyz), q.vector.w);                  \
 }                                                                             \
-/* The identity rotation has no axis; (1, 0, 0) is returned for it. */        \
+/* The identity rotation has no axis: the division yields NaN elements, as   \
+ * observed on macOS 26.7.3 (MAC-EVIDENCE.md); test_quirk_identity_axis_is_nan.*/ \
 SIMD_FN V3 simd_axis(Q q) {                                                   \
     V3 i = q.vector.xyz;                                                      \
-    T len = simd_length(i);                                                   \
-    if (len == 0) return (V3){1, 0, 0};                                       \
-    return i / len;                                                           \
+    return i / simd_length(i);                                                \
 }                                                                             \
 SIMD_FN V3 simd_act(Q q, V3 v) {                                              \
     V3 i = q.vector.xyz;                                                      \
@@ -133,12 +135,20 @@ SIMD_FN Q simd_quaternion(M4 m) {                                             \
     return simd_quaternion(r);                                                \
 }                                                                             \
 /* The shortest rotation from one unit vector to another. */                  \
+/* QUIRK: for exactly opposite vectors the rotation is a half turn about     \
+ * normalize(cross(from, e)), where e is the basis vector along the smallest \
+ * |component| of from (the first one on ties). Not documented. Evidence:    \
+ * black-box observation on macOS 26.7.3 x86_64 (tier 2) for six inputs,     \
+ * MAC-EVIDENCE.md. Test: test_quirk_opposite_vectors_rotation_axis. */      \
 SIMD_FN Q simd_quaternion(V3 from, V3 to) {                                   \
     T d = simd_dot(from, to);                                                 \
     V3 axis = simd_cross(from, to);                                           \
     if (d < -1 + 1e-6) {                                                      \
         /* Opposite vectors: rotate by pi about any perpendicular axis. */    \
-        V3 other = simd_abs(from.x) < (T)0.9 ? (V3){1, 0, 0} : (V3){0, 1, 0}; \
+        T ax = simd_abs(from.x), ay = simd_abs(from.y), az = simd_abs(from.z);\
+        V3 other = (V3){1, 0, 0};                                             \
+        if (ay < ax && ay <= az) other = (V3){0, 1, 0};                       \
+        else if (az < ax && az < ay) other = (V3){0, 0, 1};                   \
         axis = simd_normalize(simd_cross(from, other));                       \
         Q q = {{axis.x, axis.y, axis.z, 0}};                                  \
         return q;                                                             \

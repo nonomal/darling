@@ -165,9 +165,22 @@ static void test_quaternion(void)
 	simd_quatf sum = simd_add(q, q);
 	CHECK(near_f(sum.vector.w, 2 * h) && near_f(simd_dot(q, q), 1));
 	CHECK(simd_equal(simd_sub(sum, q), q));
-	// zero-length input normalizes to the identity (isolated behaviour, see the header)
+	// quirks observed on macOS 26 (see the QUIRK comments in quaternion.h)
 	simd_quatf zero = simd_quaternion(0.0f, 0.0f, 0.0f, 0.0f);
-	CHECK(simd_normalize(zero).vector.w == 1);
+	simd_quatf zn = simd_normalize(zero); // test_quirk_zero_quaternion_normalizes_to_identity
+	CHECK(zn.vector.x == 0 && zn.vector.y == 0 && zn.vector.z == 0 && zn.vector.w == 1);
+	simd_float3 ia = simd_axis(ident); // test_quirk_identity_axis_is_nan
+	CHECK(isnan(ia.x) && isnan(ia.y) && isnan(ia.z));
+	// non-unit axis is used as given
+	simd_quatf nu = simd_quaternion((float)M_PI_2, (simd_float3){0, 0, 2});
+	CHECK(near_f(nu.vector.z, 2 * h) && near_f(nu.vector.w, h));
+	// test_quirk_opposite_vectors_rotation_axis
+	const simd_float3 oin[] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.6f, 0.8f, 0}, {0.8f, 0, 0.6f}, {0, 0.6f, -0.8f}, {0.6f, 0.6f, 0.52915f}};
+	const simd_float3 oax[] = {{0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0.8f, -0.6f, 0}, {-0.6f, 0, 0.8f}, {0, -0.8f, -0.6f}, {0.707107f, -0.707107f, 0}};
+	for (int k = 0; k < 7; k++) {
+		simd_quatf oq = simd_quaternion(oin[k], -oin[k]);
+		CHECK(near3(oq.vector.xyz, oax[k]) && near_f(oq.vector.w, 0));
+	}
 	// double precision
 	simd_quatd qd = simd_quaternion(M_PI_2, (simd_double3){0, 0, 1});
 	simd_double3 r = simd_act(qd, (simd_double3){1, 0, 0});
