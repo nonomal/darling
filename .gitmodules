@@ -52,6 +52,9 @@
 [submodule "src/external/darling-dmg"]
 	path = src/external/darling-dmg
 	url = ../darling-dmg.git
+[submodule "src/external/bomutils"]
+	path = src/external/bomutils
+	url = ../bomutils.git
 [submodule "src/external/installer"]
 	path = src/external/installer
 	url = ../darling-installer.git
@@ -339,15 +342,19 @@
 [submodule "src/external/libressl-2.2.9"]
 	path = src/external/libressl-2.2.9
 	url = ../darling-libressl.git
+	branch = v2.2.9
 [submodule "src/external/libressl-2.5.5"]
 	path = src/external/libressl-2.5.5
 	url = ../darling-libressl.git
+	branch = v2.5.5
 [submodule "src/external/libressl-2.6.5"]
 	path = src/external/libressl-2.6.5
 	url = ../darling-libressl.git
+	branch = v2.6.5
 [submodule "src/external/libressl-2.8.3"]
 	path = src/external/libressl-2.8.3
 	url = ../darling-libressl.git
+	branch = v2.8.3
 [submodule "src/external/OpenLDAP"]
 	path = src/external/OpenLDAP
 	url = ../darling-openldap.git
@@ -450,3 +457,20 @@
 [submodule "src/external/xnu"]
 	path = src/external/xnu
 	url = ../darling-xnu.git
+[submodule "src/external/libpcap"]
+	path = src/external/libpcap
+	url = ../darling-libpcap.git
+[submodule "src/external/stanford-srp"]
+	path = src/external/stanford-srp
+	url = ../stanford-srp.git
+[submodule "src/external/OpenCombine"]
+	path = src/external/OpenCombine
+	url = ../OpenCombine.git
+[submodule "src/external/swift-foundation"]
+	path = src/external/swift-foundation
+	url = ../swift-foundation.git
+	branch = release/6.3
+[submodule "src/external/swift-cmark"]
+	path = src/external/swift-cmark
+	url = ../swift-cmark.git
+	branch = release/6.3

@@ -30,7 +30,25 @@ CMakeCache.txt
 Module.symvers
 
 # Directories where too much temp stuff may lay around
-tests
+# (anchored to the top level only -- this used to be unanchored and silently
+# ignored any "tests" directory anywhere in the tree, e.g. src/CoreAudio/**/tests/)
+/tests/*
+!/tests/adhoc-sign/
+!/tests/adhoc-sign/**
+!/tests/coreaudio/
+!/tests/coreaudio/**
+!/tests/launcher/
+!/tests/launcher/**
+!/tests/libm/
+!/tests/libm/**
+!/tests/mldr/
+!/tests/mldr/**
+!/tests/opendirectory/
+!/tests/opendirectory/**
+!/tests/prefsd/
+!/tests/prefsd/**
+!/tests/shellspawn/
+!/tests/shellspawn/**
 
 # The suggested build folder
 build
@@ -53,14 +71,16 @@ debian/tmp/
 debian/darling-core/
 debian/darling-system/
 debian/darling-cli/
+debian/darling-cli-python2-common/
 debian/darling-ffi/
 debian/darling-cli-devenv/
 debian/darling-cli-gui-common/
 debian/darling-iokitd/
+debian/darling-iosurface/
 debian/darling-cli-devenv-gui-common/
 debian/darling-cli-extra/
 debian/darling-gui/
-debian/darling-python/
+debian/darling-python2/
 debian/darling-cli-python-common/
 debian/darling-pyobjc/
 debian/darling-ruby/
@@ -75,3 +95,4 @@ debian/*.substvars
 
 .idea
 cmake-build-*
+.worktrees/

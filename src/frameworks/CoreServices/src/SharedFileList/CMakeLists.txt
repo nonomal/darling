@@ -13,7 +13,8 @@ add_framework(SharedFileList
 	PARENT "CoreServices"
 
 	SOURCES
-		empty.c
+		constants.c
+		sharedfilelist.c
 
 	DEPENDENCIES
 		CoreFoundation

@@ -1,4 +1,5 @@
 set(CarbonCore_SRCS
+	Aliases.cpp
 	CoreEndian.cpp
 	Multiprocessing.cpp
 	TextUtils.cpp
@@ -49,6 +50,8 @@ add_framework(CarbonCore
 
 	SOURCES 
 		${CarbonCore_SRCS}
+	RESOURCES
+		Info.plist Info.plist
 	
 	DEPENDENCIES
 		CoreFoundation

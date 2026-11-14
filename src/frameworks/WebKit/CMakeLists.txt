@@ -13,6 +13,7 @@ generate_sdk_framework(WebKit
 )
 
 add_framework(WebKit
+    IOSSUPPORT_ALIAS
     FAT
     CURRENT_VERSION
     VERSION ${FRAMEWORK_VERSION}
@@ -47,6 +48,15 @@ add_framework(WebKit
         src/_WKWebsiteDataStore.m
         src/_WKWebsiteDataStoreConfiguration.m
         src/_WKWebsitePolicies.m
+        src/DOMElement.m
+        src/DOMNode.m
+        src/DOMObject.m
+        src/WebView.m
+        src/WebDownload.m
+        src/WebHistory.m
+        src/WebHistoryItem.m
+        src/WebPolicyDelegate.m
+        src/WebScriptObject.m
         src/WKCustomProtocolLoader.m
         src/WKCustomProtocol.m
         src/WKNetworkSessionDelegate.m
@@ -87,6 +97,7 @@ add_framework(WebKit
         src/WKDOMRange.m
         src/WKDOMText.m
         src/WKDOMTextIterator.m
+        src/WKError.m
         src/WKFrameInfo.m
         src/WKFullKeyboardAccessWatcher.m
         src/WKFullScreenWindowController.m
@@ -151,6 +162,7 @@ add_framework(WebKit
         src/WKWebProcessPlugInScriptWorld.m
         src/WKWebsiteDataRecord.m
         src/WKWebsiteDataStore.m
+        src/WKUnavailableWebViewBackend.m
         src/WKWebView.m
         src/WKWebViewConfiguration.m
         src/WKWindowFeatures.m
@@ -159,4 +171,20 @@ add_framework(WebKit
         system
         objc
         Foundation
+        CFNetwork
+        AppKit
+)
+
+# The web view classes are written with ARC.
+set_source_files_properties(
+    src/WKNavigation.m
+    src/WKPreferences.m
+    src/WKScriptMessage.m
+    src/WKUnavailableWebViewBackend.m
+    src/WKUserContentController.m
+    src/WKUserScript.m
+    src/WKWebView.m
+    src/WKWebViewConfiguration.m
+    src/WKWebsiteDataStore.m
+    PROPERTIES COMPILE_FLAGS "-fobjc-arc"
 )

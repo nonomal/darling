@@ -41,8 +41,44 @@ enum {
 	dsRdWrShPerm = 4,
 };
 
+typedef SInt16 FSVolumeRefNum;
+typedef UInt32 FSVolumeInfoBitmap;
+
+typedef struct FSVolumeInfo {
+	UTCDateTime createDate;
+	UTCDateTime modifyDate;
+	UTCDateTime backupDate;
+	UTCDateTime checkedDate;
+	UInt32 fileCount;
+	UInt32 folderCount;
+	UInt64 totalBytes;
+	UInt64 freeBytes;
+	UInt32 blockSize;
+	UInt32 totalBlocks;
+	UInt32 freeBlocks;
+	UInt32 nextAllocation;
+	UInt32 rsrcClumpSize;
+	UInt32 dataClumpSize;
+	UInt32 nextCatalogID;
+	UInt8 finderInfo[32];
+	UInt16 flags;
+	UInt16 filesystemID;
+	UInt16 signature;
+	UInt16 driveNumber;
+	FSIORefNum driverRefNum;
+} FSVolumeInfo;
+
 OSErr FSGetDataForkName(HFSUniStr255* dataForkName);
 OSErr FSGetResourceForkName(HFSUniStr255* rsrcForkName);
+
+OSErr FSOpenFork(const FSRef* ref, UniCharCount forkNameLength, const UniChar* forkName, SInt8 permissions, FSIORefNum* forkRefNum);
+OSErr FSGetForkSize(FSIORefNum forkRefNum, SInt64* forkSize);
+OSErr FSCloseFork(FSIORefNum forkRefNum);
+
+OSErr FSGetVolumeInfo(FSVolumeRefNum volume, ItemCount volumeIndex, FSVolumeRefNum *actualVolume, FSVolumeInfoBitmap whichInfo, FSVolumeInfo *info, HFSUniStr255 *volumeName, FSRef *rootDirectory);
+
+OSStatus FSCopyObjectSync(const FSRef *source, const FSRef *destinationDir, CFStringRef copyName, FSRef *newRef, OptionBits whichInfo);
+OSStatus FSMoveObjectSync(const FSRef *source, const FSRef *destinationDir, CFStringRef moveName, FSRef *newRef, OptionBits whichInfo);
 
 #ifdef __cplusplus
 }

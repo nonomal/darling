@@ -21,8 +21,9 @@
 #ifndef _CoreMedia_H_
 #define _CoreMedia_H_
 
-
 #include <CoreMedia/CMTime.h>
+#include <CoreMedia/CMFormatDescription.h>
+#include <CoreMedia/CMSampleBuffer.h>
 
 void* AudioToolbox_AudioConverterDispose(void);
 void* AudioToolbox_AudioConverterGetProperty(void);

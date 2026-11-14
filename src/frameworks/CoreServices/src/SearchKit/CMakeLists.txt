@@ -13,7 +13,10 @@ add_framework(SearchKit
 	PARENT "CoreServices"
 
 	SOURCES
-		empty.c
+		SKAnalysis.c
+		SKIndex.c
+	RESOURCES
+		Info.plist Info.plist
 
 	DEPENDENCIES
 		CoreFoundation
