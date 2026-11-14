@@ -461,3 +461,18 @@ Stop and ask a maintainer instead of proceeding when:
 - [ ] Provenance note included
 - [ ] New dependencies' licenses checked
 
+
+## 12. Agent skills for working on Darling
+
+How-to guides for agents are kept in a separate repository,
+[darlinghq/darling-skills](https://github.com/darlinghq/darling-skills):
+building and installing a change, running tests inside the guest (including
+GUI tests on X11 and Wayland), debugging with lldb, checking which APIs an
+application needs, and contributing AppDB reports. Its README explains how to
+install them for Claude Code and other agents.
+
+- If your harness supports skills, install them. Otherwise read the matching
+  `SKILL.md` before building, testing or debugging a change at runtime.
+- The skills describe *how* to do things. This file describes *what* is
+  allowed. Where they conflict, this file wins.
+- Improvements to the skills go to the darling-skills repository, not here.
