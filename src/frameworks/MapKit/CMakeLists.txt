@@ -20,6 +20,7 @@ add_framework(MapKit
 
     SOURCES
         src/MapKit.m
+        src/MKGeometry.m
         src/MKMouseOverLabelRecognizer.m
         src/MKURLParser.m
         src/MKPlaceSectionHeaderView.m
