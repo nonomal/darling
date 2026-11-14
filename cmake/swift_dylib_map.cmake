@@ -33,6 +33,7 @@ set(DARLING_SWIFT_GENERATED_DYLIBS
 	libswiftDispatch.dylib
 	libswiftos.dylib
 	libswiftXPC.dylib
+	libswiftUniformTypeIdentifiers.dylib
 	libswiftIOKit.dylib
 	libswiftCoreAudio.dylib
 	libswiftCompression.dylib
