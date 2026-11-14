@@ -37,6 +37,10 @@ along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "dthreads.h"
 #include "thread_stack.h"
+#if defined(__aarch64__)
+#include <stddef.h>
+#include <linux/rseq.h>
+#endif
 
 #include <darlingserver/rpc.h>
 
@@ -438,5 +442,22 @@ static __thread void* darwin_tsd_slot;
 
 uintptr_t __darling_arm64_tsd_slot_offset(void) {
     return (uintptr_t)&darwin_tsd_slot - (uintptr_t)__builtin_thread_pointer();
+}
+
+/* The C library's restartable sequences area (glibc 2.35 and later, see
+ * <sys/rseq.h>): __rseq_offset is its offset from the thread pointer, the same
+ * on every thread, and __rseq_size is 0 when it was not registered with the
+ * kernel. Weak, so that a C library without them leaves both undefined. */
+extern const ptrdiff_t __rseq_offset __attribute__((weak));
+extern const unsigned int __rseq_size __attribute__((weak));
+
+/* Stores the thread-pointer-relative offset of the rseq cpu_id_start field,
+ * which the kernel keeps equal to the CPU the thread runs on, and returns
+ * true; false when the C library has no registered rseq area. */
+bool __darling_arm64_rseq_cpu_offset(intptr_t* offset) {
+    if (&__rseq_offset == NULL || &__rseq_size == NULL || __rseq_size == 0)
+        return false;
+    *offset = (intptr_t)__rseq_offset + (intptr_t)offsetof(struct rseq, cpu_id_start);
+    return true;
 }
 #endif

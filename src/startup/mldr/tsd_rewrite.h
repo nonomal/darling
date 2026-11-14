@@ -37,8 +37,9 @@ along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 // libsystem_kernel fills with the Darwin TSD base. Both rewritten words keep
 // their position, so no branch or relocation in the image changes.
 //
-// A lone TPIDRRO_EL0 read (for example the CPU number, which masks with #7)
-// is left alone: it already yields zero, which is a valid CPU number.
+// A lone TPIDRRO_EL0 read (for example an older CPU number read, which masks
+// with #7) is left alone: it already yields zero, which is a valid CPU number.
+// CPU number reads from TPIDR_EL0 are handled further below.
 //
 // Encodings are from the Arm Architecture Reference Manual for A-profile
 // (DDI 0487): the MRS (register) instruction with TPIDRRO_EL0 (op0=3, op1=3,
@@ -115,6 +116,124 @@ static inline size_t mldr_tsd_rewrite_reads(uint32_t* insns, size_t count, uintp
 		{
 			insns[i] = MLDR_A64_MRS_TPIDR_EL0 | rt;
 			insns[i + 1] = MLDR_A64_LDR_X_UOFFSET | (uint32_t)((slot_offset / 8) << 10) | (rt << 5) | rt;
+			rewritten++;
+			i++;
+		}
+	}
+	return rewritten;
+}
+
+// --- CPU number reads ---------------------------------------------------------
+//
+// Darwin keeps the CPU number in bits 0-11 of TPIDR_EL0 and nothing else in
+// that register for user code; xnu's public libsyscall os/tsd.h reads it as
+//
+//     mrs Xt, TPIDR_EL0
+//     and Rd, Xt, #0xfff       (Rd is Wd or Xd)
+//
+// Under Linux TPIDR_EL0 is the thread pointer, so the pair would yield the low
+// bits of a TLS address. mldr keeps the MRS (Xt still receives the thread
+// pointer, as it would without the rewrite) and replaces the AND with a 32-bit
+// load of the cpu_id_start field of the thread's rseq area, which Linux keeps
+// at a fixed offset from the thread pointer and always holds a possible CPU
+// number (0 before registration):
+//
+//     mrs Xt, TPIDR_EL0
+//     ldr Wd, [Xt, #offset]    (LDUR for small negative offsets)
+//
+// When that offset is unknown or out of range of a single load, the AND
+// becomes `movz Wd, #0`, i.e. CPU 0, which every caller has to accept.
+//
+// Encodings (DDI 0487): AND (immediate) with N:immr:imms = 1:0:11 (64-bit) or
+// 0:0:11 (32-bit) for #0xfff, LDR (immediate, unsigned offset, 32-bit), LDUR
+// (32-bit) and MOVZ (32-bit).
+
+#define MLDR_A64_AND_X_LOW12         0x92402C00u // AND Xd, Xn, #0xfff
+#define MLDR_A64_AND_W_LOW12         0x12002C00u // AND Wd, Wn, #0xfff
+#define MLDR_A64_LDR_W_UOFFSET       0xB9400000u // LDR Wt, [Xn, #imm12*4]
+#define MLDR_A64_LDUR_W              0xB8400000u // LDUR Wt, [Xn, #simm9]
+#define MLDR_A64_MOVZ_W              0x52800000u // MOVZ Wd, #imm16
+
+// How the AND of a CPU number read pair is replaced.
+struct mldr_cpu_number_source
+{
+	bool rseq;        // load from the rseq area, else the constant 0
+	intptr_t offset;  // thread-pointer-relative offset of cpu_id_start
+};
+
+// Returns the source to use for an rseq cpu_id_start field at `offset` from
+// the thread pointer (`known` false: no rseq area). Offsets a single load
+// cannot reach fall back to the constant.
+static inline struct mldr_cpu_number_source mldr_cpu_number_source_for(bool known, intptr_t offset)
+{
+	struct mldr_cpu_number_source src = { false, 0 };
+	if (!known || (offset & 3) != 0)
+		return src;
+	if ((offset >= 0 && offset <= 4095 * 4) || (offset >= -256 && offset <= 255))
+	{
+		src.rseq = true;
+		src.offset = offset;
+	}
+	return src;
+}
+
+// Returns true when `first` and `second` are a CPU number read pair: the MRS
+// writes Xt (never XZR) and the AND masks that register to its low 12 bits
+// into a general register (never SP). Stores the AND's destination in `*dest`.
+static inline bool mldr_cpu_read_pair(uint32_t first, uint32_t second, uint32_t* dest)
+{
+	if ((first & MLDR_A64_MRS_MASK) != MLDR_A64_MRS_TPIDR_EL0)
+		return false;
+	uint32_t rt = first & 0x1F;
+	if (rt == 31)
+		return false;
+	uint32_t op = second & MLDR_A64_AND_X_MASK;
+	if (op != MLDR_A64_AND_X_LOW12 && op != MLDR_A64_AND_W_LOW12)
+		return false;
+	if (((second >> 5) & 0x1F) != rt || (second & 0x1F) == 31)
+		return false;
+	*dest = second & 0x1F;
+	return true;
+}
+
+// The instruction that replaces the AND: Wd = CPU number, with Xbase holding
+// the thread pointer.
+static inline uint32_t mldr_cpu_number_load(struct mldr_cpu_number_source src, uint32_t base, uint32_t dest)
+{
+	if (!src.rseq)
+		return MLDR_A64_MOVZ_W | dest;
+	if (src.offset >= 0)
+		return MLDR_A64_LDR_W_UOFFSET | (uint32_t)((src.offset / 4) << 10) | (base << 5) | dest;
+	return MLDR_A64_LDUR_W | (((uint32_t)src.offset & 0x1FF) << 12) | (base << 5) | dest;
+}
+
+// Number of CPU number read pairs in `insns`; changes nothing.
+static inline size_t mldr_cpu_count_reads(const uint32_t* insns, size_t count)
+{
+	size_t found = 0;
+	uint32_t rd;
+	for (size_t i = 0; i + 1 < count; i++)
+	{
+		if (mldr_cpu_read_pair(insns[i], insns[i + 1], &rd))
+		{
+			found++;
+			i++;
+		}
+	}
+	return found;
+}
+
+// Rewrites the AND of every CPU number read pair in `insns` and returns how
+// many were rewritten. Same caller duties as mldr_tsd_rewrite_reads().
+static inline size_t mldr_cpu_rewrite_reads(uint32_t* insns, size_t count, struct mldr_cpu_number_source src)
+{
+	size_t rewritten = 0;
+	uint32_t rd;
+	for (size_t i = 0; i + 1 < count; i++)
+	{
+		if (mldr_cpu_read_pair(insns[i], insns[i + 1], &rd))
+		{
+			insns[i + 1] = mldr_cpu_number_load(src, insns[i] & 0x1F, rd);
 			rewritten++;
 			i++;
 		}

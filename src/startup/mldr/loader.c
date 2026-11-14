@@ -130,18 +130,21 @@ static void mldr_explain_mmap_failure(int err, uintptr_t addr)
 #include "tsd_rewrite.h"
 
 uintptr_t __darling_arm64_tsd_slot_offset(void);
+bool __darling_arm64_rseq_cpu_offset(intptr_t* offset);
 
 // Changes the Darwin TSD base reads in the instruction sections of one mapped
-// segment so that they read the native TLS slot (see tsd_rewrite.h). Only
-// sections the Mach-O marks as holding instructions are scanned, so data
-// words that happen to look like the pair are never touched. The pages are
-// made writable only while they are patched, and are never writable and
-// executable together.
+// segment so that they read the native TLS slot, and the Darwin CPU number
+// reads so that they yield the CPU number (see tsd_rewrite.h). Only sections
+// the Mach-O marks as holding instructions are scanned, so data words that
+// happen to look like a pair are never touched. The pages are made writable
+// only while they are patched, and are never writable and executable together.
 static void mldr_rewrite_tsd_reads(struct segment_command_64* seg, uintptr_t seg_addr, int useprot, size_t host_ps)
 {
 	const uintptr_t slot_offset = __darling_arm64_tsd_slot_offset();
-	if (!mldr_tsd_slot_offset_valid(slot_offset))
-		return;
+	const bool rewrite_tsd = mldr_tsd_slot_offset_valid(slot_offset);
+	intptr_t rseq_offset = 0;
+	const bool rseq_known = __darling_arm64_rseq_cpu_offset(&rseq_offset);
+	const struct mldr_cpu_number_source cpu_source = mldr_cpu_number_source_for(rseq_known, rseq_offset);
 
 	// the section headers follow the segment command, inside its cmdsize
 	if (seg->cmdsize < sizeof(*seg) || (seg->cmdsize - sizeof(*seg)) / sizeof(struct section_64) < seg->nsects)
@@ -168,7 +171,9 @@ static void mldr_rewrite_tsd_reads(struct segment_command_64* seg, uintptr_t seg
 
 		uint32_t* insns = (uint32_t*) (seg_addr + offset);
 		size_t count = size / sizeof(uint32_t);
-		if (mldr_tsd_count_reads(insns, count) == 0)
+		const size_t tsd_reads = rewrite_tsd ? mldr_tsd_count_reads(insns, count) : 0;
+		const size_t cpu_reads = mldr_cpu_count_reads(insns, count);
+		if (tsd_reads == 0 && cpu_reads == 0)
 			continue;
 
 		uintptr_t first_page = ((uintptr_t) insns) & ~(host_ps - 1);
@@ -178,12 +183,15 @@ static void mldr_rewrite_tsd_reads(struct segment_command_64* seg, uintptr_t seg
 
 		if (mprotect((void*) first_page, end - first_page, PROT_READ | PROT_WRITE) != 0)
 		{
-			fprintf(stderr, "mldr: cannot make %s,%s writable to rewrite TSD reads at %p: %s\n",
+			fprintf(stderr, "mldr: cannot make %s,%s writable to rewrite thread register reads at %p: %s\n",
 				seg->segname, sect->sectname, (void*) first_page, strerror(errno));
 			exit(1);
 		}
 
-		mldr_tsd_rewrite_reads(insns, count, slot_offset);
+		if (tsd_reads != 0)
+			mldr_tsd_rewrite_reads(insns, count, slot_offset);
+		if (cpu_reads != 0)
+			mldr_cpu_rewrite_reads(insns, count, cpu_source);
 
 		// Make the new instructions visible to instruction fetch before the
 		// pages can execute again.
