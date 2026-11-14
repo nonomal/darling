@@ -60,6 +60,13 @@ uintptr_t __darling_arm64_tsd_slot_offset(void)
 {
 	return TEST_TSD_SLOT_OFFSET;
 }
+// The thread-pointer-relative offset of the rseq cpu_id_start field.
+#define TEST_RSEQ_CPU_OFFSET (-32)
+bool __darling_arm64_rseq_cpu_offset(intptr_t* offset)
+{
+	*offset = TEST_RSEQ_CPU_OFFSET;
+	return true;
+}
 #endif
 
 static int code_signing_gate(int fd, uint64_t image_offset, struct load_results* lr)
@@ -372,8 +379,9 @@ static void test_low_slots(void)
 #if defined(__aarch64__)
 // The Darwin TSD base read pair (mrs Xn, TPIDRRO_EL0; and Xn, Xn, #~7) in an
 // instruction section is rewritten to read the native TLS slot; the same words
-// in a data section, and a lone CPU number read, are left alone; the code pages
-// are executable and not writable afterwards.
+// in a data section, and a lone TPIDRRO_EL0 CPU number read, are left alone. The
+// CPU number read pair (mrs Xn, TPIDR_EL0; and Wd, Wn, #0xfff) loads the rseq
+// CPU number instead. The code pages are executable and not writable afterwards.
 static void test_tsd_reads(void)
 {
 	const uint32_t mrs_ro = 0xD53BD068u; // mrs x8, TPIDRRO_EL0
@@ -381,6 +389,8 @@ static void test_tsd_reads(void)
 	const uint32_t mrs_el0 = 0xD53BD048u; // mrs x8, TPIDR_EL0
 	const uint32_t ldr_slot = 0xF9400108u | ((TEST_TSD_SLOT_OFFSET / 8) << 10); // ldr x8, [x8, #slot]
 	const uint32_t and7 = 0x92400908u; // and x8, x8, #7 (CPU number)
+	const uint32_t and_low12 = 0x12002D00u; // and w0, w8, #0xfff
+	const uint32_t ldur_cpu = 0xB85E0100u; // ldur w0, [x8, #-32]
 
 	struct fixture f;
 	fixture_init(&f, MH_EXECUTE, MH_PIE, UNIT);
@@ -397,13 +407,13 @@ static void test_tsd_reads(void)
 	strncpy(sect[0].sectname, "__text", sizeof(sect[0].sectname));
 	strncpy(sect[0].segname, "__TEXT", sizeof(sect[0].segname));
 	sect[0].addr = IMAGE_BASE + 0x1000;
-	sect[0].size = 0x10;
+	sect[0].size = 0x18;
 	sect[0].offset = 0x1000;
 	sect[0].flags = S_REGULAR | S_ATTR_PURE_INSTRUCTIONS | S_ATTR_SOME_INSTRUCTIONS;
 	strncpy(sect[1].sectname, "__const", sizeof(sect[1].sectname));
 	strncpy(sect[1].segname, "__TEXT", sizeof(sect[1].segname));
 	sect[1].addr = IMAGE_BASE + 0x2000;
-	sect[1].size = 0x10;
+	sect[1].size = 0x18;
 	sect[1].offset = 0x2000;
 	sect[1].flags = S_REGULAR;
 	f.cmd_offset += seg->cmdsize;
@@ -411,9 +421,9 @@ static void test_tsd_reads(void)
 	f.header->sizeofcmds += seg->cmdsize;
 
 	uint32_t* text = (uint32_t*) (f.bytes + 0x1000);
-	text[0] = mrs_ro; text[1] = and_not7; text[2] = mrs_ro; text[3] = and7;
+	text[0] = mrs_ro; text[1] = and_not7; text[2] = mrs_ro; text[3] = and7; text[4] = mrs_el0; text[5] = and_low12;
 	uint32_t* data = (uint32_t*) (f.bytes + 0x2000);
-	data[0] = mrs_ro; data[1] = and_not7; data[2] = mrs_ro; data[3] = and7;
+	data[0] = mrs_ro; data[1] = and_not7; data[2] = mrs_ro; data[3] = and7; data[4] = mrs_el0; data[5] = and_low12;
 
 	int fd = fixture_file(&f);
 	struct load_results lr = {0};
@@ -424,7 +434,8 @@ static void test_tsd_reads(void)
 
 	check(t[0] == mrs_el0 && t[1] == ldr_slot, "tsd reads: the pair in an instruction section reads the native TLS slot");
 	check(t[2] == mrs_ro && t[3] == and7, "tsd reads: a CPU number read is left alone");
-	check(d[0] == mrs_ro && d[1] == and_not7, "tsd reads: the same words in a data section are left alone");
+	check(t[4] == mrs_el0 && t[5] == ldur_cpu, "tsd reads: the TPIDR_EL0 CPU number pair loads the rseq CPU number");
+	check(d[0] == mrs_ro && d[1] == and_not7 && d[4] == mrs_el0 && d[5] == and_low12, "tsd reads: the same words in a data section are left alone");
 
 	// the code pages are r-x
 	char line[256];
