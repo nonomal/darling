@@ -40,6 +40,7 @@ along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 #include "fat_slice.h"
 #include <sys/resource.h>
 #include <sys/prctl.h>
+#include <sys/personality.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <darlingserver/rpc.h>
@@ -765,6 +766,14 @@ static void ensure_top_range_free(struct load_results* lr, unsigned long stack_s
 			return; // invalid or exhausted retry budget
 		retries = (int)value;
 	}
+
+	// Without address space randomization the Linux stack always sits at the
+	// very top of a 32-bit address space, so another try would find the same
+	// layout. The Darwin stack and commpage are placed by us regardless, so
+	// randomization is only given up for the Linux-side placement.
+	int persona = personality(0xffffffff);
+	if (persona != -1 && (persona & ADDR_NO_RANDOMIZE))
+		personality(persona & ~ADDR_NO_RANDOMIZE);
 
 	char selfpath[1024];
 	ssize_t len = readlink("/proc/self/exe", selfpath, sizeof(selfpath) - 1);
