@@ -1,7 +1,7 @@
 /*
  This file is part of Darling.
 
- Copyright (C) 2021 Lubos Dolezel
+ Copyright (C) 2026 Lubos Dolezel
 
  Darling is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -17,8 +17,17 @@
  along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <Foundation/Foundation.h>
 
-// TODO
-typedef int GLKMatrix3;
-typedef int GLKMatrix4;
+#ifndef _GLKMath_H_
+#define _GLKMath_H_
+
+#include <GLKit/GLKMathTypes.h>
+#include <GLKit/GLKVector2.h>
+#include <GLKit/GLKVector3.h>
+#include <GLKit/GLKVector4.h>
+#include <GLKit/GLKMatrix3.h>
+#include <GLKit/GLKMatrix4.h>
+#include <GLKit/GLKQuaternion.h>
+#include <GLKit/GLKMathUtils.h>
+
+#endif
